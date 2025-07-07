@@ -13,7 +13,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "askout1"
+DB_NAME = "askout"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -28,8 +28,51 @@ dp.include_router(router)
 client = AsyncIOMotorClient(MONGODB_URL)
 db = client[DB_NAME]
 
+# --- Translation dictionary ---
+TRANSLATIONS = {
+    "en": {
+        "welcome": "👋 <b>Welcome to Ask Out!</b>\n\nYour anonymous question link:\n<code>{link}</code>\n\nAnyone can send you anonymous messages via this link.\nShare it anywhere!",
+        "share_btn": "🔗 Share your link",
+        "send_anon": "✉️ <b>Send your anonymous message to this user.</b>\n\nJust type and send your message now.",
+        "msg_sent": "✅ Your anonymous message has been sent anonymously!",
+        "invalid_link": "Invalid or expired link.",
+        "not_registered": "You are not registered yet. Use /start to get your anonymous link.",
+        "username_usage": "Usage: <b>/setusername yourname</b>\nAllowed: a-z, 0-9, 3-20 chars.",
+        "username_invalid": "❌ Invalid username. Use only a-z, 0-9, underscores, 3-20 chars.",
+        "username_taken": "❌ This username is already taken. Try another.",
+        "username_set": "✅ Your custom username is set to <b>{username}</b>!\nYour new link:\n<code>{link}</code>",
+        "already_username": "You already have this username.",
+        "stats": "📊 <b>Your Stats</b>\n\n<b>Messages received:</b> <code>{msgs}</code>\n<b>Messages received today:</b> <code>{msgs_today}</code>\n\n<b>Link clicks:</b> <code>{clicks}</code>\n<b>Link clicks today:</b> <code>{clicks_today}</code>",
+        "lang_usage": "Usage: /language <code>\nExample: /language en or /language ur",
+        "lang_set": "✅ Language set to {lang_name}.",
+        "lang_not_supported": "❌ Language not supported. Available: {langs}"
+    },
+    "ur": {
+        "welcome": "👋 <b>خوش آمدید! یہ آپ کا اینانیمس سوال کا لنک ہے:</b>\n<code>{link}</code>\n\nاب کوئی بھی آپ کو گمنام پیغام بھیج سکتا ہے۔ اس کو کہیں بھی شیئر کریں!",
+        "share_btn": "🔗 اپنا لنک شیئر کریں",
+        "send_anon": "✉️ <b>اس صارف کو اپنا گمنام پیغام بھیجیں۔</b>\n\nبس اپنا پیغام لکھ کر بھیج دیں۔",
+        "msg_sent": "✅ آپ کا گمنام پیغام بھیج دیا گیا ہے!",
+        "invalid_link": "غلط یا ختم شدہ لنک۔",
+        "not_registered": "آپ رجسٹرڈ نہیں ہیں۔ /start استعمال کریں۔",
+        "username_usage": "استعمال: <b>/setusername آپکانام</b>\nصرف a-z، 0-9، 3-20 حروف استعمال کریں۔",
+        "username_invalid": "❌ غلط یوزر نیم۔ صرف a-z، 0-9، انڈر اسکور، 3-20 حروف۔",
+        "username_taken": "❌ یہ یوزر نیم پہلے سے موجود ہے۔ نیا کوشش کریں۔",
+        "username_set": "✅ آپکا یوزر نیم <b>{username}</b> سیٹ ہو گیا!\nآپکا نیا لنک:\n<code>{link}</code>",
+        "already_username": "آپکا یوزر نیم پہلے سے یہی ہے۔",
+        "stats": "📊 <b>آپکے اعداد و شمار</b>\n\n<b>موصول شدہ پیغامات:</b> <code>{msgs}</code>\n<b>آج موصولہ پیغامات:</b> <code>{msgs_today}</code>\n\n<b>لنک کلکس:</b> <code>{clicks}</code>\n<b>آج کے لنک کلکس:</b> <code>{clicks_today}</code>",
+        "lang_usage": "استعمال: /language <code>\nمثال: /language en یا /language ur",
+        "lang_set": "✅ زبان تبدیل ہو گئی: {lang_name}",
+        "lang_not_supported": "❌ یہ زبان دستیاب نہیں۔ دستیاب زبانیں: {langs}"
+    }
+}
+LANG_NAMES = {'en': 'English', 'ur': 'اردو'}
+
+def t(user, key, **kwargs):
+    lang = user.get("language", "en") if user else "en"
+    msg = TRANSLATIONS.get(lang, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"][key])
+    return msg.format(**kwargs)
+
 def generate_short_username():
-    """Generate a short, unique username like 'anon12345'."""
     return f"anon{secrets.randbelow(100000):05d}"
 
 def today_str():
@@ -38,13 +81,12 @@ def today_str():
 async def get_or_create_user(user_id):
     user = await db.users.find_one({"user_id": user_id})
     if not user:
-        # generate unique short username
         while True:
             short_username = generate_short_username()
             if not await db.users.find_one({"short_username": short_username}):
                 break
         link_id = secrets.token_urlsafe(8)
-        await db.users.insert_one({
+        user = {
             "user_id": user_id,
             "link_id": link_id,
             "short_username": short_username,
@@ -52,8 +94,9 @@ async def get_or_create_user(user_id):
             "link_clicks": 0,
             "messages_received_daily": {},
             "link_clicks_daily": {},
-        })
-        return short_username
+            "language": "en"
+        }
+        await db.users.insert_one(user)
     return user.get("short_username") or user.get("link_id")
 
 async def get_user_by_link_id(link_id):
@@ -62,81 +105,73 @@ async def get_user_by_link_id(link_id):
 def extract_link_id(start_param):
     return start_param if start_param else None
 
-def get_share_keyboard(link, short_username):
+def get_share_keyboard(link, user, short_username):
     btn = InlineKeyboardButton(
-        text="🔗 Share your link",
+        text=t(user, "share_btn"),
         switch_inline_query=f"Ask me anything! It's anonymous: {link}"
     )
-    # This will let the user forward a pre-filled message in any chat
     return InlineKeyboardMarkup(inline_keyboard=[[btn]])
 
 @router.message(CommandStart(deep_link=True))
 async def start_with_param(message: Message, command: CommandStart, state: FSMContext):
     link_id = extract_link_id(command.args)
+    user = await db.users.find_one({"user_id": message.from_user.id})
     if link_id:
-        user = await get_user_by_link_id(link_id)
-        if not user:
-            await message.answer("Invalid or expired link.")
+        target_user = await get_user_by_link_id(link_id)
+        if not target_user:
+            await message.answer(t(user, "invalid_link"))
             return
-        # If sender is NOT the owner, increment link click stats
-        if user["user_id"] != message.from_user.id:
+        if target_user["user_id"] != message.from_user.id:
             today = today_str()
-            # Increment all time and today's stats
             await db.users.update_one(
-                {"user_id": user["user_id"]},
+                {"user_id": target_user["user_id"]},
                 {
                     "$inc": {"link_clicks": 1},
-                    "$set": {f"link_clicks_daily.{today}": (user.get("link_clicks_daily", {}).get(today, 0) + 1)}
+                    "$set": {f"link_clicks_daily.{today}": (target_user.get("link_clicks_daily", {}).get(today, 0) + 1)}
                 }
             )
         await state.update_data(target_link_id=link_id)
-        await message.answer(
-            "✉️ <b>Send your anonymous message to this user.</b>\n\n"
-            "Just type and send your message now."
-        )
+        await message.answer(t(user, "send_anon"))
     else:
         user_short_username = await get_or_create_user(message.from_user.id)
+        user = await db.users.find_one({"user_id": message.from_user.id})
         bot_username = (await bot.me()).username
         link = f"https://t.me/{bot_username}?start={user_short_username}"
         await message.answer(
-            f"👋 <b>Welcome to Ask Out!</b>\n\n"
-            f"Your anonymous question link:\n<code>{link}</code>\n\n"
-            "Anyone can send you anonymous messages via this link.\nShare it anywhere!",
-            reply_markup=get_share_keyboard(link, user_short_username)
+            t(user, "welcome", link=link),
+            reply_markup=get_share_keyboard(link, user, user_short_username)
         )
 
 @router.message(CommandStart(deep_link=False))
 async def start_no_param(message: Message, state: FSMContext):
     user_short_username = await get_or_create_user(message.from_user.id)
+    user = await db.users.find_one({"user_id": message.from_user.id})
     bot_username = (await bot.me()).username
     link = f"https://t.me/{bot_username}?start={user_short_username}"
     await message.answer(
-        f"👋 <b>Welcome to Ask Out!</b>\n\n"
-        f"Your anonymous question link:\n<code>{link}</code>\n\n"
-        "Anyone can send you anonymous messages via this link.\nShare it anywhere!",
-        reply_markup=get_share_keyboard(link, user_short_username)
+        t(user, "welcome", link=link),
+        reply_markup=get_share_keyboard(link, user, user_short_username)
     )
     await state.clear()
 
 @router.message(Command("setusername"))
 async def set_custom_username(message: Message):
+    user = await db.users.find_one({"user_id": message.from_user.id})
     args = message.text.strip().split()
     if len(args) != 2:
-        await message.answer("Usage: <b>/setusername yourname</b>\nAllowed: a-z, 0-9, 3-20 chars.")
+        await message.answer(t(user, "username_usage"))
         return
     new_username = args[1].lower()
     if not re.fullmatch(r"[a-z0-9_]{3,20}", new_username):
-        await message.answer("❌ Invalid username. Use only a-z, 0-9, underscores, 3-20 chars.")
+        await message.answer(t(user, "username_invalid"))
         return
-    # Check if taken
     existing = await db.users.find_one({"short_username": new_username})
     if existing:
         if existing["user_id"] == message.from_user.id:
-            await message.answer("You already have this username.")
+            await message.answer(t(user, "already_username"))
         else:
-            await message.answer("❌ This username is already taken. Try another.")
+            await message.answer(t(user, "username_taken"))
         return
-    # Update or set
     await db.users.update_one(
         {"user_id": message.from_user.id},
         {"$set": {"short_username": new_username}},
@@ -145,16 +180,15 @@ async def set_custom_username(message: Message):
     bot_username = (await bot.me()).username
     link = f"https://t.me/{bot_username}?start={new_username}"
     await message.answer(
-        f"✅ Your custom username is set to <b>{new_username}</b>!\n"
-        f"Your new link:\n<code>{link}</code>",
-        reply_markup=get_share_keyboard(link, new_username)
+        t(user, "username_set", username=new_username, link=link),
+        reply_markup=get_share_keyboard(link, user, new_username)
     )
 
 @router.message(Command("stats"))
 async def stats_command(message: Message):
     user = await db.users.find_one({"user_id": message.from_user.id})
     if not user:
-        await message.answer("You are not registered yet. Use /start to get your anonymous link.")
+        await message.answer(t(user, "not_registered"))
         return
     today = today_str()
     messages_received = user.get("messages_received", 0)
@@ -164,47 +198,64 @@ async def stats_command(message: Message):
     messages_today = messages_received_daily.get(today, 0)
     clicks_today = link_clicks_daily.get(today, 0)
     await message.answer(
-        f"📊 <b>Your Stats</b>\n\n"
-        f"<b>Messages received:</b> <code>{messages_received}</code>\n"
-        f"<b>Messages received today:</b> <code>{messages_today}</code>\n\n"
-        f"<b>Link clicks:</b> <code>{link_clicks}</code>\n"
-        f"<b>Link clicks today:</b> <code>{clicks_today}</code>"
+        t(user, "stats",
+          msgs=messages_received,
+          msgs_today=messages_today,
+          clicks=link_clicks,
+          clicks_today=clicks_today)
     )
+
+@router.message(Command("language"))
+async def language_command(message: Message):
+    args = message.text.strip().split()
+    user = await db.users.find_one({"user_id": message.from_user.id})
+    if len(args) != 2:
+        await message.answer(t(user, "lang_usage"))
+        return
+    lang = args[1].lower()
+    if lang not in TRANSLATIONS:
+        langs = ", ".join([f"<code>{code}</code>" for code in TRANSLATIONS])
+        await message.answer(t(user, "lang_not_supported", langs=langs))
+        return
+    await db.users.update_one(
+        {"user_id": message.from_user.id},
+        {"$set": {"language": lang}},
+        upsert=True
+    )
+    await message.answer(t({"language": lang}, "lang_set", lang_name=LANG_NAMES[lang]))
 
 @router.message(F.text)
 async def handle_anonymous_message(message: Message, state: FSMContext):
     data = await state.get_data()
+    user = await db.users.find_one({"user_id": message.from_user.id})
     target_link_id = data.get("target_link_id")
     if target_link_id:
-        user = await get_user_by_link_id(target_link_id)
-        if not user:
-            await message.answer("User not found. Maybe their link expired?")
+        target_user = await get_user_by_link_id(target_link_id)
+        if not target_user:
+            await message.answer(t(user, "invalid_link"))
             return
-        # Send anonymously
         await bot.send_message(
-            user["user_id"],
-            f"📩 <b>You received an anonymous message:</b>\n\n{message.text}"
+            target_user["user_id"],
+            t(target_user, "msg_sent") + "\n\n" + message.text
         )
-        # Update stats (increment messages_received, and daily)
         today = today_str()
         await db.users.update_one(
-            {"user_id": user["user_id"]},
+            {"user_id": target_user["user_id"]},
             {
                 "$inc": {"messages_received": 1},
-                "$set": {f"messages_received_daily.{today}": (user.get("messages_received_daily", {}).get(today, 0) + 1)}
+                "$set": {f"messages_received_daily.{today}": (target_user.get("messages_received_daily", {}).get(today, 0) + 1)}
             }
         )
-        await message.answer("✅ Your anonymous message has been sent anonymously!")
+        await message.answer(t(user, "msg_sent"))
         await state.clear()
     else:
         user_short_username = await get_or_create_user(message.from_user.id)
+        user = await db.users.find_one({"user_id": message.from_user.id})
         bot_username = (await bot.me()).username
         link = f"https://t.me/{bot_username}?start={user_short_username}"
         await message.answer(
-            f"👋 <b>Welcome to Ask Out!</b>\n\n"
-            f"Your anonymous question link:\n<code>{link}</code>\n\n"
-            "Anyone can send you anonymous messages via this link.\nShare it anywhere!",
-            reply_markup=get_share_keyboard(link, user_short_username)
+            t(user, "welcome", link=link),
+            reply_markup=get_share_keyboard(link, user, user_short_username)
         )
 
 if __name__ == "__main__":
