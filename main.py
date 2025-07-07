@@ -1,28 +1,35 @@
 import logging
+import secrets
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.filters import Command
-from aiogram.types import Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from motor.motor_asyncio import AsyncIOMotorClient
 from aiogram.enums import ParseMode
-from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
 from aiogram.fsm.storage.memory import MemoryStorage
-import secrets
+from aiogram.client.default import DefaultBotProperties
+from motor.motor_asyncio import AsyncIOMotorClient
 
+# === CONFIG ===
 API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "askout"
 
+# === LOGGING ===
 logging.basicConfig(level=logging.INFO)
-bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
+
+# === BOT INITIALIZATION ===
+bot = Bot(
+    token=API_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 dp = Dispatcher(storage=MemoryStorage())
 router = Router()
 dp.include_router(router)
 
+# === MONGODB ===
 client = AsyncIOMotorClient(MONGODB_URL)
 db = client[DB_NAME]
 
-# Util: Generate unique anonymous link for user
+# === UTILS ===
 async def get_or_create_user(user_id):
     user = await db.users.find_one({"user_id": user_id})
     if not user:
@@ -37,19 +44,20 @@ async def get_or_create_user(user_id):
 async def get_user_by_link_id(link_id):
     return await db.users.find_one({"link_id": link_id})
 
-# /start handler
+# === HANDLERS ===
+
 @router.message(Command("start"))
-async def start(message: Message, state: FSMContext):
+async def start(message: Message):
     link_id = await get_or_create_user(message.from_user.id)
-    link = f"https://t.me/{(await bot.me()).username}?start=ask_{link_id}"
+    bot_username = (await bot.me()).username
+    link = f"https://t.me/{bot_username}?start=ask_{link_id}"
     await message.answer(
-        f"👋 Welcome to <b>Ask Out</b>!\n\n"
+        f"👋 <b>Welcome to Ask Out!</b>\n\n"
         f"Share your anonymous question link:\n<code>{link}</code>\n\n"
         "Anyone can send you anonymous messages via this link.\n"
         "Share it anywhere!"
     )
 
-# Parse special /start links
 @router.message(F.text.regexp(r"^/start ask_([a-zA-Z0-9_\-]+)$"))
 async def ask_entry(message: Message, regexp_command):
     link_id = regexp_command.group(1)
@@ -57,13 +65,13 @@ async def ask_entry(message: Message, regexp_command):
     if not user:
         await message.answer("Invalid or expired link.")
         return
+    # Store in FSM context for this chat
+    await message.chat.set_data({"target_link_id": link_id})
     await message.answer(
         f"Send your anonymous message to this user.\n\n"
         "Just type and send your message now."
     )
-    await message.chat.set_data({"target_link_id": link_id})
 
-# Handle all text as anonymous message if in ask mode
 @router.message(F.text)
 async def handle_anonymous_message(message: Message):
     chat_data = await message.chat.get_data()
@@ -85,6 +93,7 @@ async def handle_anonymous_message(message: Message):
             "or open a user's link to send them a message."
         )
 
+# === MAIN ===
 if __name__ == "__main__":
     import asyncio
     asyncio.run(dp.start_polling(bot))
