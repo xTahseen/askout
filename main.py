@@ -6,6 +6,7 @@ from aiogram.enums import ParseMode
 from aiogram.types import Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
+from aiogram.fsm.context import FSMContext
 from motor.motor_asyncio import AsyncIOMotorClient
 
 API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
@@ -40,28 +41,24 @@ async def get_user_by_link_id(link_id):
     return await db.users.find_one({"link_id": link_id})
 
 def extract_ask_link_id(start_param):
-    # Handles both "ask_xxxx" and direct link_id
     if start_param and start_param.startswith("ask_"):
         return start_param.split("ask_")[1]
     return None
 
 @router.message(CommandStart(deep_link=True))
-async def start_with_param(message: Message, command: CommandStart):
-    # Handles /start ask_xxxxxxxx
+async def start_with_param(message: Message, command: CommandStart, state: FSMContext):
     link_id = extract_ask_link_id(command.args)
     if link_id:
         user = await get_user_by_link_id(link_id)
         if not user:
             await message.answer("Invalid or expired link.")
             return
-        # Set FSM/session for this chat (for next message)
-        await message.chat.set_data({"target_link_id": link_id})
+        await state.update_data(target_link_id=link_id)
         await message.answer(
             "✉️ <b>Send your anonymous message to this user.</b>\n\n"
             "Just type and send your message now."
         )
     else:
-        # Standard /start
         user_link_id = await get_or_create_user(message.from_user.id)
         bot_username = (await bot.me()).username
         link = f"https://t.me/{bot_username}?start=ask_{user_link_id}"
@@ -72,8 +69,7 @@ async def start_with_param(message: Message, command: CommandStart):
         )
 
 @router.message(CommandStart(deep_link=False))
-async def start_no_param(message: Message):
-    # Standard /start (no argument)
+async def start_no_param(message: Message, state: FSMContext):
     user_link_id = await get_or_create_user(message.from_user.id)
     bot_username = (await bot.me()).username
     link = f"https://t.me/{bot_username}?start=ask_{user_link_id}"
@@ -82,11 +78,12 @@ async def start_no_param(message: Message):
         f"Share your anonymous question link:\n<code>{link}</code>\n\n"
         "Anyone can send you anonymous messages via this link.\nShare it anywhere!"
     )
+    await state.clear()
 
 @router.message(F.text)
-async def handle_anonymous_message(message: Message):
-    chat_data = await message.chat.get_data()
-    target_link_id = chat_data.get("target_link_id")
+async def handle_anonymous_message(message: Message, state: FSMContext):
+    data = await state.get_data()
+    target_link_id = data.get("target_link_id")
     if target_link_id:
         user = await get_user_by_link_id(target_link_id)
         if not user:
@@ -97,9 +94,8 @@ async def handle_anonymous_message(message: Message):
             f"📩 <b>You received an anonymous message:</b>\n\n{message.text}"
         )
         await message.answer("✅ Your anonymous message has been sent anonymously!")
-        await message.chat.set_data({})  # Clear session
+        await state.clear()
     else:
-        # Not in ask mode, just show info
         user_link_id = await get_or_create_user(message.from_user.id)
         bot_username = (await bot.me()).username
         link = f"https://t.me/{bot_username}?start=ask_{user_link_id}"
