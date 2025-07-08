@@ -6,7 +6,7 @@ import aiohttp
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile, BotCommand
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.context import FSMContext
@@ -370,6 +370,22 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
             reply_markup=get_share_keyboard(link, lang)
         )
 
+async def set_bot_commands():
+    # List your commands here, update as needed
+    commands = [
+        BotCommand(command="start", description="Get your anonymous link"),
+        BotCommand(command="setlang", description="Set bot language"),
+        BotCommand(command="language", description="Set bot language"),
+        BotCommand(command="setusername", description="Set your public username"),
+        BotCommand(command="stats", description="Show your stats"),
+    ]
+    await bot.set_my_commands(commands)
+
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(dp.start_polling(bot))
+
+    async def main():
+        await set_bot_commands()  # Sync commands to Telegram
+        await dp.start_polling(bot)
+
+    asyncio.run(main())
