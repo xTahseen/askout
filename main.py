@@ -374,7 +374,6 @@ async def set_bot_commands():
     # List your commands here, update as needed
     commands = [
         BotCommand(command="start", description="Get your anonymous link"),
-        BotCommand(command="setlang", description="Set bot language"),
         BotCommand(command="language", description="Set bot language"),
         BotCommand(command="setusername", description="Set your public username"),
         BotCommand(command="stats", description="Show your stats"),
