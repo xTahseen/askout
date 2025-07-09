@@ -20,7 +20,7 @@ def generate_message_image(text, name="@Askoutbot", compact=True):
         "height": height     # New parameter
     }
     
-    base_url = "https://v0-chat-bubble-generator-two.vercel.app/api/simple"
+    base_url = "https://cbubble.vercel.app/api/simple"
     query_string = urlencode(params)
     api_url = f"{base_url}?{query_string}"
     
