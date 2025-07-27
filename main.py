@@ -19,7 +19,7 @@ from config import GENERATE_IMAGE_ON_ANONYMOUS, ALLOW_ANONYMOUS_REPLY
 from image_utils import generate_message_image
 import os
 
-API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
+API_TOKEN = "8067086161:AAF_LUeCuWOOe9-Nnf4sXyj3LgXDhdZp0yY"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "askout"
 
@@ -80,13 +80,29 @@ def get_share_keyboard(link, lang):
 async def get_user_lang(user_id):
     user = await db.users.find_one({"user_id": user_id})
     return user.get("language", "en") if user else "en"
-
+    
 def get_lang_markup():
     buttons = [
         [InlineKeyboardButton(text=LANG_NAMES[code], callback_data=f"lang_{code}")]
         for code in LANGS
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+# --- NEW FUNCTION: Store anonymous messages for Mini App ---
+async def store_anonymous_message(recipient_user_id, message_text, sender_user_id=None):
+    """Store anonymous message in database for Mini App display"""
+    message_doc = {
+        "recipient_user_id": recipient_user_id,
+        "message_text": message_text,
+        "sender_user_id": sender_user_id,
+        "timestamp": datetime.utcnow(),
+        "message_type": "anonymous"
+    }
+    try:
+        await db.messages.insert_one(message_doc)
+        logging.info(f"Stored anonymous message for user {recipient_user_id}")
+    except Exception as e:
+        logging.error(f"Failed to store anonymous message: {e}")
 
 # --- Helper to send thumbs up reaction using the raw Bot API (Bot API 7.0+ only) ---
 async def set_reaction(bot, chat_id, message_id, emoji):
@@ -317,6 +333,13 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
             return
 
         sent_msg = None
+
+        # --- STORE THE ANONYMOUS MESSAGE FOR MINI APP ---
+        await store_anonymous_message(
+            recipient_user_id=user["user_id"],
+            message_text=message.text,
+            sender_user_id=message.from_user.id
+        )
 
         # If image generation is ON, send only image with caption
         if GENERATE_IMAGE_ON_ANONYMOUS:
