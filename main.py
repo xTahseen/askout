@@ -19,7 +19,7 @@ from config import GENERATE_IMAGE_ON_ANONYMOUS, ALLOW_ANONYMOUS_REPLY
 from image_utils import generate_message_image
 import os
 
-API_TOKEN = "8067086161:AAF_LUeCuWOOe9-Nnf4sXyj3LgXDhdZp0yY"
+API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "askout"
 
