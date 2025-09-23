@@ -4,7 +4,7 @@ import tempfile
 import uuid
 from playwright.async_api import async_playwright
 
-# Path to fonts relative to this file
+# Paths to local Poppins font files in the fonts directory
 BASE_DIR = pathlib.Path(__file__).parent.resolve()
 FONTS_DIR = BASE_DIR / "fonts"
 POPPINS_REGULAR = FONTS_DIR / "Poppins-Regular.ttf"
@@ -35,7 +35,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         body {{
             margin: 0;
             padding: 0;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', 'Twemoji', 'EmojiOne', sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
