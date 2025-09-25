@@ -23,9 +23,9 @@ from config import GENERATE_IMAGE_ON_ANONYMOUS, ALLOW_ANONYMOUS_REPLY
 from image import generate_message_image
 import os
 
-API_TOKEN = "8300519461:AAGub3h_FqGkggWkGGE95Pgh8k4u6deI_F4"
+API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "askout3"
+DB_NAME = "askout"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -98,7 +98,7 @@ async def log_user_start(user, user_obj):
     now = datetime.now(timezone.utc)
     formatted_date = now.strftime("%d %b %Y, %H:%M UTC")
     user_info = (
-        f"馃懁 <b>Bot started</b>\n"
+        f"👤 <b>Bot started</b>\n"
         f"<b>ID:</b> <code>{user['user_id']}</code>\n"
         f"<b>Username:</b> <code>@{user_obj.username or '-'}</code>\n"
         f"<b>First Name:</b> <code>{user_obj.first_name or '-'}</code>\n"
@@ -273,18 +273,18 @@ async def start_no_param(message: Message, state: FSMContext):
 @router.message(Command("newsletter"))
 async def newsletter_command(message: Message, state: FSMContext):
     if message.from_user.id not in ADMIN_IDS:
-        await message.answer("鉂� You are not authorized to use this command.")
+        await message.answer("❌ You are not authorized to use this command.")
         return
     total_users = await db.users.count_documents({})
     await message.answer(
-        f"馃摪 <b>Newsletter Mode</b>\nTotal users: <b>{total_users}</b>\n\nSend the newsletter text to broadcast to all users."
+        f"📰 <b>Newsletter Mode</b>\nTotal users: <b>{total_users}</b>\n\nSend the newsletter text to broadcast to all users."
     )
     await state.set_state(AdminStates.waiting_for_newsletter_text)
 
 @router.message(AdminStates.waiting_for_newsletter_text)
 async def send_newsletter(message: Message, state: FSMContext):
     if message.from_user.id not in ADMIN_IDS:
-        await message.answer("鉂� You are not authorized to use this command.")
+        await message.answer("❌ You are not authorized to use this command.")
         return
     newsletter_text = message.text
     users_cursor = db.users.find({}, {"user_id": 1})
@@ -295,7 +295,7 @@ async def send_newsletter(message: Message, state: FSMContext):
             count += 1
         except Exception as e:
             logging.warning(f"Failed to send newsletter to {user['user_id']}: {e}")
-    await message.answer(f"鉁� Newsletter sent to {count} users.")
+    await message.answer(f"✅ Newsletter sent to {count} users.")
     await state.clear()
 
 @router.message(F.reply_to_message)
@@ -313,14 +313,14 @@ async def handle_reply(message: Message):
             lang = await get_user_lang(orig_sender_id)
             sent = await bot.send_message(
                 orig_sender_id,
-                f"馃摡 <b>You received a reply to your anonymous message:</b>\n\n{message.text}"
+                f"📩 <b>You received a reply to your anonymous message:</b>\n\n{message.text}"
             )
             await db.anonymous_links.insert_one({
                 "reply_message_id": sent.message_id,
                 "to_user_id": orig_sender_id,
                 "from_user_id": message.from_user.id
             })
-            await set_reaction(bot, message.chat.id, message.message_id, "馃憤")
+            await set_reaction(bot, message.chat.id, message.message_id, "👍")
             return
 
 @router.message(Command("setusername"))
@@ -396,7 +396,6 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
         )
 
         if GENERATE_IMAGE_ON_ANONYMOUS:
-            # FIX: generate_message_image is now a synchronous function (imgkit)!
             image_path = generate_message_image(message.text)
             caption = LANGS[user.get('language', 'en')]['anonymous_received']
             if image_path:
