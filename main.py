@@ -462,6 +462,14 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
             reply_markup=get_share_keyboard(link, lang)
         )
 
+@router.message(
+    F.photo | F.video | F.document | F.audio | F.sticker |
+    F.animation | F.voice | F.video_note | F.location | F.contact
+)
+async def handle_media_not_supported(message: Message):
+    lang = await get_user_lang(message.from_user.id)
+    await message.answer(LANGS[lang]["media_not_supported"])
+
 async def set_bot_commands():
     admin_commands = [
         BotCommand(command="start", description="Get your anonymous link"),
