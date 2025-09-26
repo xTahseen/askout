@@ -15,7 +15,6 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from langs import LANGS, LANG_NAMES
 
-# --- Settings for admin and logging ---
 LOG_GROUP_ID = -1002054393773
 ADMIN_IDS = [6387028671]
 
@@ -23,7 +22,7 @@ from config import GENERATE_IMAGE_ON_ANONYMOUS, ALLOW_ANONYMOUS_REPLY
 from image import generate_message_image
 import os
 
-API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
+API_TOKEN = "8300519461:AAGub3h_FqGkggWkGGE95Pgh8k4u6deI_F4"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "askout"
 
@@ -159,7 +158,6 @@ async def language_selected(callback_query, state: FSMContext):
     data = await state.get_data()
     start_param = data.get("start_param")
 
-    # Create user if not exists
     user = await db.users.find_one({"user_id": callback_query.from_user.id})
     is_new = False
     if not user:
@@ -196,8 +194,9 @@ async def language_selected(callback_query, state: FSMContext):
         target_user = await get_user_by_link_id(start_param)
         if target_user:
             await state.update_data(target_link_id=start_param)
+            username = target_user.get("short_username") or target_user.get("link_id")
             await callback_query.message.edit_text(
-                LANGS[lang_code]["send_anonymous"]
+                LANGS[lang_code]["send_anonymous"].format(username=f"<b>{username}</b>")
             )
         else:
             await callback_query.message.edit_text(
@@ -222,26 +221,28 @@ async def start_with_param(message: Message, command: CommandStart, state: FSMCo
     if not user:
         await state.update_data(start_param=link_id)
         await message.answer(LANGS["en"]["choose_lang"], reply_markup=get_lang_markup())
-        # Logging will be done after language is set (in setlang handler)
         return
     await log_user_start(user, message.from_user)
     lang = await get_user_lang(message.from_user.id)
     if link_id:
-        user = await get_user_by_link_id(link_id)
-        if not user:
+        target_user = await get_user_by_link_id(link_id)
+        if not target_user:
             await message.answer(LANGS[lang]["invalid_link"])
             return
-        if user["user_id"] != message.from_user.id:
+        if target_user["user_id"] != message.from_user.id:
             today = today_str()
             await db.users.update_one(
-                {"user_id": user["user_id"]},
+                {"user_id": target_user["user_id"]},
                 {
                     "$inc": {"link_clicks": 1},
-                    "$set": {f"link_clicks_daily.{today}": (user.get("link_clicks_daily", {}).get(today, 0) + 1)}
+                    "$set": {f"link_clicks_daily.{today}": (target_user.get("link_clicks_daily", {}).get(today, 0) + 1)}
                 }
             )
         await state.update_data(target_link_id=link_id)
-        await message.answer(LANGS[lang]["send_anonymous"])
+        username = target_user.get("short_username") or target_user.get("link_id")
+        await message.answer(
+            LANGS[lang]["send_anonymous"].format(username=f"<b>{username}</b>")
+        )
     else:
         user_short_username = await get_or_create_user(message.from_user.id)
         bot_username = (await bot.me()).username
@@ -257,7 +258,6 @@ async def start_no_param(message: Message, state: FSMContext):
     if not user:
         await state.clear()
         await message.answer(LANGS["en"]["choose_lang"], reply_markup=get_lang_markup())
-        # Logging will be done after language is set (in setlang handler)
         return
     await log_user_start(user, message.from_user)
     lang = await get_user_lang(message.from_user.id)
@@ -311,16 +311,19 @@ async def handle_reply(message: Message):
         if record:
             orig_sender_id = record["from_user_id"]
             lang = await get_user_lang(orig_sender_id)
-            sent = await bot.send_message(
-                orig_sender_id,
-                f"📩 <b>You received a reply to your anonymous message:</b>\n\n{message.text}"
-            )
-            await db.anonymous_links.insert_one({
-                "reply_message_id": sent.message_id,
-                "to_user_id": orig_sender_id,
-                "from_user_id": message.from_user.id
-            })
-            await set_reaction(bot, message.chat.id, message.message_id, "👍")
+            try:
+                sent = await bot.send_message(
+                    orig_sender_id,
+                    f"📩 <b>You received a reply to your anonymous message:</b>\n\n{message.text}"
+                )
+                await db.anonymous_links.insert_one({
+                    "reply_message_id": sent.message_id,
+                    "to_user_id": orig_sender_id,
+                    "from_user_id": message.from_user.id
+                })
+                await set_reaction(bot, message.chat.id, message.message_id, "👍")
+            except Exception as e:
+                await message.answer(LANGS[lang]["blocked_error"])
             return
 
 @router.message(Command("setusername"))
@@ -395,6 +398,7 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
             sender_user_id=message.from_user.id
         )
 
+        error_sending = False
         if GENERATE_IMAGE_ON_ANONYMOUS:
             image_path = generate_message_image(message.text)
             caption = LANGS[user.get('language', 'en')]['anonymous_received']
@@ -405,19 +409,32 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
                         photo=FSInputFile(image_path),
                         caption=caption
                     )
+                except Exception as e:
+                    error_sending = True
                 finally:
                     if os.path.exists(image_path):
                         os.remove(image_path)
             else:
+                try:
+                    sent_msg = await bot.send_message(
+                        user["user_id"],
+                        caption
+                    )
+                except Exception as e:
+                    error_sending = True
+        else:
+            try:
                 sent_msg = await bot.send_message(
                     user["user_id"],
-                    caption
+                    LANGS[user.get('language', 'en')]['anonymous_received'].format(message=message.text)
                 )
-        else:
-            sent_msg = await bot.send_message(
-                user["user_id"],
-                LANGS[user.get('language', 'en')]['anonymous_received'].format(message=message.text)
-            )
+            except Exception as e:
+                error_sending = True
+
+        if error_sending:
+            await message.answer(LANGS[lang]["blocked_error"])
+            await state.clear()
+            return
 
         if sent_msg:
             await db.anonymous_links.insert_one({
@@ -446,7 +463,6 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
         )
 
 async def set_bot_commands():
-    # Owner/admin commands (YOUR user id)
     admin_commands = [
         BotCommand(command="start", description="Get your anonymous link"),
         BotCommand(command="language", description="Set bot language"),
@@ -454,16 +470,13 @@ async def set_bot_commands():
         BotCommand(command="stats", description="Show your stats"),
         BotCommand(command="newsletter", description="Send newsletter to all users (admin)"),
     ]
-    # Commands for all other users (no newsletter)
     user_commands = [
         BotCommand(command="start", description="Get your anonymous link"),
         BotCommand(command="language", description="Set bot language"),
         BotCommand(command="setusername", description="Set your public username"),
         BotCommand(command="stats", description="Show your stats"),
     ]
-    # Set for all users (default/global)
     await bot.set_my_commands(user_commands)
-    # Set for admin only (using admin's user ID)
     for admin_id in ADMIN_IDS:
         await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
 
