@@ -101,7 +101,7 @@ async def log_user_start(user, user_obj):
     user_info = (
         f"👤 <b>Bot started</b>\n"
         f"<b>ID:</b> <code>{user['user_id']}</code>\n"
-        f"<b>Username:</b> <code>@{user_obj.username or '-'}</code>\n"
+        f"<b>Username:</b> @{user_obj.username or '-'}\n"
         f"<b>First Name:</b> <code>{user_obj.first_name or '-'}</code>\n"
         f"<b>Language:</b> <code>{user.get('language', 'en')}</code>\n"
         f"<b>Date:</b> <code>{formatted_date}</code>"
@@ -239,7 +239,7 @@ async def admin_id_command(message: Message):
         f"<b>User ID:</b> <code>{user_id}</code>\n"
         f"<b>Short Username:</b> <code>{short_username}</code>\n"
         f"<b>Link ID:</b> <code>{link_id}</code>\n"
-        f"<b>Telegram Username:</b> <code>@{telegram_username}</code>\n"
+        f"<b>Telegram Username:</b> @{telegram_username}\n"
         f"<b>Name:</b> <code>{telegram_name}</code>\n"
         f"<b>Language:</b> <code>{language}</code>\n"
         f"<b>Messages Received:</b> <code>{messages_received}</code>\n"
