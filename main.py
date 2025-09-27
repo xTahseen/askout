@@ -6,7 +6,7 @@ import aiohttp
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile, BotCommand, BotCommandScopeChat
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile, BotCommand, BotCommandScopeChat, CallbackQuery
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.context import FSMContext
@@ -21,6 +21,8 @@ ADMIN_IDS = [6387028671]
 from config import GENERATE_IMAGE_ON_ANONYMOUS, ALLOW_ANONYMOUS_REPLY
 from image import generate_message_image
 import os
+
+from translate import google_translate, detect_language
 
 API_TOKEN = "8300519461:AAGub3h_FqGkggWkGGE95Pgh8k4u6deI_F4"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
@@ -109,19 +111,22 @@ async def log_user_start(user, user_obj):
     except Exception as e:
         logging.error(f"Failed to log user to log group: {e}")
 
-async def store_anonymous_message(recipient_user_id, message_text, sender_user_id=None):
+async def store_anonymous_message(recipient_user_id, message_text, sender_user_id=None, telegram_message_id=None):
     message_doc = {
         "recipient_user_id": recipient_user_id,
         "message_text": message_text,
         "sender_user_id": sender_user_id,
         "timestamp": datetime.now(timezone.utc),
-        "message_type": "anonymous"
+        "message_type": "anonymous",
+        "telegram_message_id": telegram_message_id  # store Telegram message id for mapping
     }
     try:
-        await db.messages.insert_one(message_doc)
+        result = await db.messages.insert_one(message_doc)
         logging.info(f"Stored anonymous message for user {recipient_user_id}")
+        return result.inserted_id
     except Exception as e:
         logging.error(f"Failed to store anonymous message: {e}")
+        return None
 
 async def set_reaction(bot, chat_id, message_id, emoji):
     token = bot.token
@@ -146,6 +151,22 @@ async def set_reaction(bot, chat_id, message_id, emoji):
     except Exception as e:
         logging.warning(f"Failed to set reaction: {e}")
     return False
+
+def get_translate_keyboard(msg_id, detected_lang, target_lang):
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=LANGS[target_lang]['translate_btn'],
+            callback_data=f"translate|{msg_id}|{detected_lang}|{target_lang}"
+        )
+    ]])
+
+def get_showorig_keyboard(msg_id, detected_lang, target_lang):
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=LANGS[target_lang]['show_original_btn'],
+            callback_data=f"showorig|{msg_id}|{detected_lang}|{target_lang}"
+        )
+    ]])
 
 @router.message(Command("language"))
 @router.message(Command("setlang"))
@@ -391,17 +412,12 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
             return
 
         sent_msg = None
+        msg_detected_lang = detect_language(message.text)
+        user_lang = user.get('language', 'en') # recipient's language
 
-        await store_anonymous_message(
-            recipient_user_id=user["user_id"],
-            message_text=message.text,
-            sender_user_id=message.from_user.id
-        )
-
-        error_sending = False
         if GENERATE_IMAGE_ON_ANONYMOUS:
             image_path = generate_message_image(message.text)
-            caption = LANGS[user.get('language', 'en')]['anonymous_received']
+            caption = LANGS[user_lang]['anonymous_received']
             if image_path:
                 try:
                     sent_msg = await bot.send_photo(
@@ -410,7 +426,7 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
                         caption=caption
                     )
                 except Exception as e:
-                    error_sending = True
+                    sent_msg = None
                 finally:
                     if os.path.exists(image_path):
                         os.remove(image_path)
@@ -421,27 +437,34 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
                         caption
                     )
                 except Exception as e:
-                    error_sending = True
+                    sent_msg = None
         else:
             try:
                 sent_msg = await bot.send_message(
                     user["user_id"],
-                    LANGS[user.get('language', 'en')]['anonymous_received'].format(message=message.text)
+                    LANGS[user_lang]['anonymous_received'].format(message=message.text)
                 )
             except Exception as e:
-                error_sending = True
+                sent_msg = None
 
-        if error_sending:
+        if sent_msg is None:
             await message.answer(LANGS[lang]["blocked_error"])
             await state.clear()
             return
 
-        if sent_msg:
-            await db.anonymous_links.insert_one({
-                "reply_message_id": sent_msg.message_id,
-                "to_user_id": user["user_id"],
-                "from_user_id": message.from_user.id
-            })
+        # Store the mapping between telegram_message_id and the anonymous message
+        await store_anonymous_message(
+            recipient_user_id=user["user_id"],
+            message_text=message.text,
+            sender_user_id=message.from_user.id,
+            telegram_message_id=sent_msg.message_id
+        )
+
+        await db.anonymous_links.insert_one({
+            "reply_message_id": sent_msg.message_id,
+            "to_user_id": user["user_id"],
+            "from_user_id": message.from_user.id
+        })
 
         today = today_str()
         await db.users.update_one(
@@ -451,6 +474,17 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
                 "$set": {f"messages_received_daily.{today}": (user.get("messages_received_daily", {}).get(today, 0) + 1)}
             }
         )
+        # Only show translate button if language differs
+        if msg_detected_lang != user_lang and msg_detected_lang != "unknown":
+            try:
+                await bot.edit_message_reply_markup(
+                    chat_id=user["user_id"],
+                    message_id=sent_msg.message_id,
+                    reply_markup=get_translate_keyboard(str(sent_msg.message_id), msg_detected_lang, user_lang)
+                )
+            except Exception:
+                pass
+
         await message.answer(LANGS[lang]["anonymous_sent"])
         await state.clear()
     else:
@@ -469,6 +503,64 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
 async def handle_media_not_supported(message: Message):
     lang = await get_user_lang(message.from_user.id)
     await message.answer(LANGS[lang]["media_not_supported"])
+
+@router.callback_query(lambda c: c.data and (c.data.startswith("translate|") or c.data.startswith("showorig|")))
+async def handle_translate_callbacks(callback_query: CallbackQuery):
+    data = callback_query.data.split("|")
+    action = data[0]
+    telegram_msg_id = int(data[1])  # This is the Telegram msg_id you stored
+    from_lang = data[2]
+    to_lang = data[3]
+    user_id = callback_query.from_user.id
+
+    # Retrieve the correct anonymous message by telegram_message_id
+    msg_doc = await db.messages.find_one({
+        "recipient_user_id": user_id,
+        "message_type": "anonymous",
+        "telegram_message_id": telegram_msg_id
+    })
+    if not msg_doc:
+        await callback_query.answer(LANGS[to_lang]["original_not_found"], show_alert=True)
+        return
+    original_text = msg_doc["message_text"]
+
+    if action == "translate":
+        try:
+            translated, _ = await google_translate(original_text, from_lang, to_lang)
+            markup = get_showorig_keyboard(str(telegram_msg_id), from_lang, to_lang)
+            try:
+                await bot.edit_message_caption(
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    caption=translated,
+                    reply_markup=markup
+                )
+            except Exception:
+                await bot.edit_message_text(
+                    translated,
+                    chat_id=callback_query.message.chat.id,
+                    message_id=callback_query.message.message_id,
+                    reply_markup=markup
+                )
+        except Exception as e:
+            await callback_query.answer(LANGS[to_lang]["translation_failed"], show_alert=True)
+    elif action == "showorig":
+        markup = get_translate_keyboard(str(telegram_msg_id), from_lang, to_lang)
+        try:
+            await bot.edit_message_caption(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                caption=original_text,
+                reply_markup=markup
+            )
+        except Exception:
+            await bot.edit_message_text(
+                original_text,
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                reply_markup=markup
+            )
+    await callback_query.answer()
 
 async def set_bot_commands():
     admin_commands = [
