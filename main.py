@@ -168,6 +168,86 @@ def get_showorig_keyboard(msg_id, detected_lang, target_lang):
         )
     ]])
 
+@router.message(Command("id"))
+async def admin_id_command(message: Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("❌ You are not authorized to use this command.")
+        return
+
+    args = message.text.strip().split()
+    user_id = None
+
+    # /id <user_id>
+    if len(args) == 2 and args[1].isdigit():
+        user_id = int(args[1])
+
+    # /id as reply
+    elif message.reply_to_message:
+        replied = message.reply_to_message
+
+        # Find the anonymous sender
+        # 1. Try anonymous_links table
+        record = await db.anonymous_links.find_one({
+            "reply_message_id": replied.message_id,
+            "to_user_id": message.chat.id
+        })
+        if record:
+            user_id = record.get("from_user_id")
+        else:
+            # 2. Try messages table
+            msg_doc = await db.messages.find_one({"telegram_message_id": replied.message_id})
+            if msg_doc:
+                user_id = msg_doc.get("sender_user_id")
+        if not user_id:
+            await message.answer("❌ Could not determine user for this anonymous message.")
+            return
+
+    else:
+        # /id with no argument and no reply
+        await message.answer(
+            "ℹ️ <b>Admin Usage:</b>\n"
+            "• Reply to an anonymous message with <b>/id</b> to see sender details.\n"
+            "• Or send <b>/id &lt;user_id&gt;</b> for a specific user.",
+            parse_mode="HTML"
+        )
+        return
+
+    user = await db.users.find_one({"user_id": user_id})
+    if not user:
+        await message.answer("❌ User not found in database.")
+        return
+
+    # Fetch Telegram info if possible (caution: may fail for deleted users)
+    try:
+        tg_user = await bot.get_chat(user_id)
+        telegram_username = tg_user.username or "-"
+        telegram_name = (tg_user.first_name or "") + (" " + tg_user.last_name if tg_user.last_name else "")
+    except Exception:
+        telegram_username = "-"
+        telegram_name = "-"
+
+    short_username = user.get("short_username", "-")
+    link_id = user.get("link_id", "-")
+    language = user.get("language", "-")
+    messages_received = user.get("messages_received", 0)
+    link_clicks = user.get("link_clicks", 0)
+    bot_username = (await bot.me()).username
+    secret_link = f"https://t.me/{bot_username}?start={short_username}"
+
+    text = (
+        f"👤 <b>User Details</b>\n"
+        f"<b>User ID:</b> <code>{user_id}</code>\n"
+        f"<b>Short Username:</b> <code>{short_username}</code>\n"
+        f"<b>Link ID:</b> <code>{link_id}</code>\n"
+        f"<b>Telegram Username:</b> <code>@{telegram_username}</code>\n"
+        f"<b>Name:</b> <code>{telegram_name}</code>\n"
+        f"<b>Language:</b> <code>{language}</code>\n"
+        f"<b>Messages Received:</b> <code>{messages_received}</code>\n"
+        f"<b>Link Clicks:</b> <code>{link_clicks}</code>\n"
+        f"<b>Secret Link:</b>\n<code>{secret_link}</code>"
+    )
+    await message.answer(text, parse_mode="HTML")
+
 @router.message(Command("language"))
 @router.message(Command("setlang"))
 async def set_language_command(message: Message):
@@ -321,6 +401,9 @@ async def send_newsletter(message: Message, state: FSMContext):
 
 @router.message(F.reply_to_message)
 async def handle_reply(message: Message):
+    if message.text and message.text.strip().startswith("/id"):
+        # Ignore /id replies here; handled by the /id command handler
+        return
     if not ALLOW_ANONYMOUS_REPLY:
         return
     replied = message.reply_to_message
@@ -569,6 +652,7 @@ async def set_bot_commands():
         BotCommand(command="setusername", description="Set your public username"),
         BotCommand(command="stats", description="Show your stats"),
         BotCommand(command="newsletter", description="Send newsletter to all users (admin)"),
+        BotCommand(command="id", description="Show user details by reply or id (admin)"),
     ]
     user_commands = [
         BotCommand(command="start", description="Get your anonymous link"),
