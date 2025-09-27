@@ -1,105 +1,31 @@
-LANGS = {
-    "en": {
-        "welcome": "👋 <b>Welcome to Ask Out!</b>\n\nYour anonymous question link:\n<code>{link}</code>\n\nAnyone can send you anonymous messages via this link.\nShare it anywhere!",
-        "share_btn": "🔗 Share your link",
-        "invalid_link": "Invalid or expired link.",
-        "send_anonymous": "✉️ <b>Send your anonymous message to {username}.</b>\n\nJust type and send your message now.",
-        "set_username_usage": "Usage: <b>/setusername yourname</b>\nAllowed: a-z, 0-9, 3-20 chars.",
-        "invalid_username": "❌ Invalid username. Use only a-z, 0-9, underscores, 3-20 chars.",
-        "username_taken": "❌ This username is already taken. Try another.",
-        "username_set": "✅ Your custom username is set to <b>{username}</b>!\nYour new link:\n<code>{link}</code>",
-        "already_username": "You already have this username.",
-        "not_registered": "You are not registered yet. Use /start to get your anonymous link.",
-        "stats": "📊 <b>Your Stats</b>\n\n<b>Messages received:</b> <code>{messages_received}</code>\n<b>Messages received today:</b> <code>{messages_today}</code>\n\n<b>Link clicks:</b> <code>{link_clicks}</code>\n<b>Clicks today:</b> <code>{clicks_today}</code>",
-        "user_not_found": "User not found. Maybe their link expired?",
-        "anonymous_received": "<b>An anonymous whisper.</b>",
-        "anonymous_sent": "✅ Your anonymous message has been sent!",
-        "choose_lang": "🌐 Please select your language",
-        "lang_set": "✅ Language set to {lang}!",
-        "blocked_error": "❌ <b>Message not delivered.</b>\nThe user may have blocked the bot.",
-        "media_not_supported": "❌ Only text messages are supported. Please send text.",
-        "translate_btn": "🌐 Translate",
-        "show_original_btn": "🔄 Show Original",
-        "translation_failed": "❌ Translation failed.",
-        "original_not_found": "Original message not found.",
-    },
-    "ru": {
-        "welcome": "👋 <b>Добро пожаловать в Ask Out!</b>\n\nВаша ссылка для анонимных вопросов:\n<code>{link}</code>\n\nЛюбой человек может отправить вам анонимное сообщение по этой ссылке.\nДелитесь ей где угодно!",
-        "share_btn": "🔗 Поделиться вашей ссылкой",
-        "invalid_link": "Недействительная или истекшая ссылка.",
-        "send_anonymous": "✉️ <b>Отправьте анонимное сообщение пользователю {username}.</b>\n\nПросто напишите и отправьте сообщение.",
-        "set_username_usage": "Использование: <b>/setusername вашеимя</b>\nДопустимо: a-z, 0-9, 3-20 символов.",
-        "invalid_username": "❌ Недопустимое имя. Только латиница, цифры, подчёркивания, 3-20 символов.",
-        "username_taken": "❌ Это имя уже занято. Попробуйте другое.",
-        "username_set": "✅ Ваше имя пользователя установлено: <b>{username}</b>!\nВаша новая ссылка:\n<code>{link}</code>",
-        "already_username": "У вас уже есть это имя пользователя.",
-        "not_registered": "Вы ещё не зарегистрированы. Используйте /start, чтобы получить свою анонимную ссылку.",
-        "stats": "📊 <b>Ваша статистика</b>\n\n<b>Получено сообщений:</b> <code>{messages_received}</code>\n<b>Сегодня получено:</b> <code>{messages_today}</code>\n\n<b>Кликов по ссылке:</b> <code>{link_clicks}</code>\n<b>Кликов сегодня:</b> <code>{clicks_today}</code>",
-        "user_not_found": "Пользователь не найден. Возможно, его ссылка устарела?",
-        "anonymous_received": "<b>Анонимный шепот.</b>",
-        "anonymous_sent": "✅ Ваше анонимное сообщение отправлено!",
-        "choose_lang": "🌐 Пожалуйста, выберите язык",
-        "lang_set": "✅ Язык установлен: {lang}!",
-        "blocked_error": "❌ <b>Сообщение не доставлено.</b>\nВозможно, пользователь заблокировал бота.",
-        "media_not_supported": "❌ Поддерживаются только текстовые сообщения. Пожалуйста, отправьте текст.",
-        "translate_btn": "🌐 Перевести",
-        "show_original_btn": "🔄 Показать оригинал",
-        "translation_failed": "❌ Не удалось перевести.",
-        "original_not_found": "Оригинальное сообщение не найдено.",
-    },
-    "ar": {
-        "welcome": "👋 <b>مرحبًا بك في Ask Out!</b>\n\nرابط سؤالك المجهول:\n<code>{link}</code>\n\nيمكن لأي شخص إرسال رسائل مجهولة عبر هذا الرابط.\nشاركها في أي مكان!",
-        "share_btn": "🔗 شارك رابطك",
-        "invalid_link": "الرابط غير صالح أو منتهي الصلاحية.",
-        "send_anonymous": "✉️ <b>أرسل رسالتك المجهولة إلى {username}.</b>\n\nفقط اكتب وأرسل رسالتك الآن.",
-        "set_username_usage": "الاستخدام: <b>/setusername اسمك</b>\nيسمح بـ: a-z، 0-9، 3-20 حرفًا.",
-        "invalid_username": "❌ اسم مستخدم غير صالح. استخدم فقط a-z، 0-9، الشرطة السفلية، 3-20 حرفًا.",
-        "username_taken": "❌ اسم المستخدم هذا مأخوذ بالفعل. جرب اسمًا آخر.",
-        "username_set": "✅ تم تعيين اسم المستخدم الخاص بك إلى <b>{username}</b>!\nرابطك الجديد:\n<code>{link}</code>",
-        "already_username": "لديك بالفعل هذا الاسم.",
-        "not_registered": "لم يتم تسجيلك بعد. استخدم /start للحصول على رابطك المجهول.",
-        "stats": "📊 <b>إحصائياتك</b>\n\n<b>عدد الرسائل المستلمة:</b> <code>{messages_received}</code>\n<b>الرسائل المستلمة اليوم:</b> <code>{messages_today}</code>\n\n<b>عدد نقرات الرابط:</b> <code>{link_clicks}</code>\n<b>النقرات اليوم:</b> <code>{clicks_today}</code>",
-        "user_not_found": "المستخدم غير موجود. ربما انتهت صلاحيته؟",
-        "anonymous_received": "<b>همسة مجهولة.</b>",
-        "anonymous_sent": "✅ تم إرسال رسالتك المجهولة!",
-        "choose_lang": "🌐 الرجاء اختيار لغتك",
-        "lang_set": "✅ تم تعيين اللغة إلى {lang}!",
-        "blocked_error": "❌ <b>لم يتم تسليم الرسالة.</b>\nربما قام المستخدم بحظر البوت.",
-        "media_not_supported": "❌ فقط الرسائل النصية مدعومة. يرجى إرسال نص.",
-        "translate_btn": "🌐 ترجمة",
-        "show_original_btn": "🔄 عرض الأصل",
-        "translation_failed": "❌ فشل في الترجمة.",
-        "original_not_found": "تعذر العثور على الرسالة الأصلية.",
-    },
-    "ko": {
-        "welcome": "👋 <b>Ask Out에 오신 것을 환영합니다!</b>\n\n익명 질문 링크:\n<code>{link}</code>\n\n누구나 이 링크를 통해 익명 메시지를 보낼 수 있습니다. 어디든 공유하세요!",
-        "share_btn": "🔗 링크 공유",
-        "invalid_link": "유효하지 않거나 만료된 링크입니다.",
-        "send_anonymous": "✉️ <b>{username}에게 익명 메시지를 보내세요.</b>\n\n지금 메시지를 입력하고 보내세요.",
-        "set_username_usage": "사용법: <b>/setusername 이름</b>\n허용: a-z, 0-9, 3-20자.",
-        "invalid_username": "❌ 잘못된 사용자 이름입니다. a-z, 0-9, 밑줄, 3-20자만 사용하세요.",
-        "username_taken": "❌ 이 사용자 이름은 이미 사용 중입니다. 다른 이름을 시도하세요.",
-        "username_set": "✅ 사용자 이름이 <b>{username}</b>로 설정되었습니다!\n새 링크:\n<code>{link}</code>",
-        "already_username": "이미 이 사용자 이름을 가지고 있습니다.",
-        "not_registered": "아직 등록되지 않았습니다. /start로 익명 링크를 받으세요.",
-        "stats": "📊 <b>내 통계</b>\n\n<b>받은 메시지:</b> <code>{messages_received}</code>\n<b>오늘 받은 메시지:</b> <code>{messages_today}</code>\n\n<b>링크 클릭:</b> <code>{link_clicks}</code>\n<b>오늘 클릭:</b> <code>{clicks_today}</code>",
-        "user_not_found": "사용자를 찾을 수 없습니다. 링크가 만료되었을 수 있습니다.",
-        "anonymous_received": "<b>익명의 속삭임.</b>",
-        "anonymous_sent": "✅ 익명 메시지가 전송되었습니다!",
-        "choose_lang": "🌐 언어를 선택하세요",
-        "lang_set": "✅ 언어가 {lang}로 설정되었습니다!",
-        "blocked_error": "❌ <b>메시지 전달 실패.</b>\n사용자가 봇을 차단했을 수 있습니다.",
-        "media_not_supported": "❌ 텍스트 메시지만 지원됩니다. 텍스트를 보내주세요.",
-        "translate_btn": "🌐 번역",
-        "show_original_btn": "🔄 원본 보기",
-        "translation_failed": "❌ 번역에 실패했습니다.",
-        "original_not_found": "원본 메시지를 찾을 수 없습니다.",
-    }
-}
+import aiohttp
+from langdetect import detect, LangDetectException
 
-LANG_NAMES = {
-    "en": "English",
-    "ru": "Русский",
-    "ar": "العربية",
-    "ko": "한국어",
-}
+async def google_translate(query, source_lang="auto", target_lang="en"):
+    url = "https://translate.google.com/translate_a/single"
+    params = {
+        "client": "gtx",
+        "sl": source_lang,
+        "tl": target_lang,
+        "dt": "t",
+        "q": query
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params, headers=headers) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                translation = "".join([item[0] for item in data[0]])
+                # Google's response contains the detected language at data[2]
+                detected_lang = data[2] if len(data) > 2 else None
+                return translation, detected_lang
+            else:
+                raise Exception("Failed to fetch translation.")
+
+def detect_language(text):
+    try:
+        return detect(text)
+    except LangDetectException:
+        return "unknown"
