@@ -3,28 +3,48 @@ import secrets
 import re
 from datetime import datetime, timezone
 import aiohttp
+import os
+
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile, BotCommand, BotCommandScopeChat, CallbackQuery
+from aiogram.types import (
+    Message, InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile, BotCommand,
+    BotCommandScopeChat, CallbackQuery
+)
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from langs import LANGS, LANG_NAMES
-
-LOG_GROUP_ID = -1002054393773
-ADMIN_IDS = [6816341239]
-
 from config import GENERATE_IMAGE_ON_ANONYMOUS, ALLOW_ANONYMOUS_REPLY
 from image import generate_message_image
-import os
-
 from translate import google_translate, detect_language
 
-API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
+# --- Newsletter imports ---
+from newsletter import (
+    NewsletterStates,
+    ask_for_content,
+    handle_waiting_for_content,
+    ask_for_caption,
+    handle_waiting_for_caption,
+    ask_for_buttons,
+    handle_waiting_for_buttons,
+    preview_newsletter,
+    broadcast_newsletter,
+    addbtn_callback,
+    next_callback,
+    prev_callback,
+    cancel_callback,
+    confirm_callback,
+)
+
+LOG_GROUP_ID = -1002054393773
+ADMIN_IDS = [6387028671]
+
+API_TOKEN = "8300519461:AAGub3h_FqGkggWkGGE95Pgh8k4u6deI_F4"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "askout"
 
@@ -40,9 +60,6 @@ dp.include_router(router)
 
 client = AsyncIOMotorClient(MONGODB_URL)
 db = client[DB_NAME]
-
-class AdminStates(StatesGroup):
-    waiting_for_newsletter_text = State()
 
 def generate_short_username():
     return f"ask{secrets.randbelow(100000):05d}"
@@ -168,6 +185,48 @@ def get_showorig_keyboard(msg_id, detected_lang, target_lang):
         )
     ]])
 
+# --- Newsletter Handlers ---
+@router.message(Command("newsletter"))
+async def newsletter_command(message: Message, state: FSMContext):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("❌ You are not authorized to use this command.")
+        return
+    await ask_for_content(message, state)
+
+@router.message(NewsletterStates.waiting_for_content)
+async def newsletter_content_handler(message: Message, state: FSMContext):
+    await handle_waiting_for_content(message, state)
+
+@router.message(NewsletterStates.waiting_for_caption)
+async def newsletter_caption_handler(message: Message, state: FSMContext):
+    await handle_waiting_for_caption(message, state)
+
+@router.message(NewsletterStates.waiting_for_buttons)
+async def newsletter_buttons_handler(message: Message, state: FSMContext):
+    await handle_waiting_for_buttons(message, state)
+
+@router.callback_query(lambda c: c.data == "newsletter_addbtn")
+async def newsletter_addbtn_cb(callback: CallbackQuery, state: FSMContext):
+    await addbtn_callback(callback)
+
+@router.callback_query(lambda c: c.data == "newsletter_next")
+async def newsletter_next_cb(callback: CallbackQuery, state: FSMContext):
+    await next_callback(callback, state, bot)
+
+@router.callback_query(lambda c: c.data == "newsletter_prev")
+async def newsletter_prev_cb(callback: CallbackQuery, state: FSMContext):
+    await prev_callback(callback, state)
+
+@router.callback_query(lambda c: c.data == "newsletter_cancel")
+async def newsletter_cancel_cb(callback: CallbackQuery, state: FSMContext):
+    await cancel_callback(callback, state)
+
+@router.callback_query(lambda c: c.data == "newsletter_confirm")
+async def newsletter_confirm_cb(callback: CallbackQuery, state: FSMContext):
+    await confirm_callback(callback, state, db, bot)
+
+# --- The rest of your handlers (unchanged from your original main.py) ---
+
 @router.message(Command("id"))
 async def admin_id_command(message: Message):
     if message.from_user.id not in ADMIN_IDS:
@@ -177,16 +236,10 @@ async def admin_id_command(message: Message):
     args = message.text.strip().split()
     user_id = None
 
-    # /id <user_id>
     if len(args) == 2 and args[1].isdigit():
         user_id = int(args[1])
-
-    # /id as reply
     elif message.reply_to_message:
         replied = message.reply_to_message
-
-        # Find the anonymous sender
-        # 1. Try anonymous_links table
         record = await db.anonymous_links.find_one({
             "reply_message_id": replied.message_id,
             "to_user_id": message.chat.id
@@ -194,16 +247,13 @@ async def admin_id_command(message: Message):
         if record:
             user_id = record.get("from_user_id")
         else:
-            # 2. Try messages table
             msg_doc = await db.messages.find_one({"telegram_message_id": replied.message_id})
             if msg_doc:
                 user_id = msg_doc.get("sender_user_id")
         if not user_id:
             await message.answer("❌ Could not determine user for this anonymous message.")
             return
-
     else:
-        # /id with no argument and no reply
         await message.answer(
             "ℹ️ <b>Admin Usage:</b>\n"
             "• Reply to an anonymous message with <b>/id</b> to see sender details.\n"
@@ -371,38 +421,9 @@ async def start_no_param(message: Message, state: FSMContext):
     )
     await state.clear()
 
-@router.message(Command("newsletter"))
-async def newsletter_command(message: Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
-        await message.answer("❌ You are not authorized to use this command.")
-        return
-    total_users = await db.users.count_documents({})
-    await message.answer(
-        f"📰 <b>Newsletter Mode</b>\nTotal users: <b>{total_users}</b>\n\nSend the newsletter text to broadcast to all users."
-    )
-    await state.set_state(AdminStates.waiting_for_newsletter_text)
-
-@router.message(AdminStates.waiting_for_newsletter_text)
-async def send_newsletter(message: Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
-        await message.answer("❌ You are not authorized to use this command.")
-        return
-    newsletter_text = message.text
-    users_cursor = db.users.find({}, {"user_id": 1})
-    count = 0
-    async for user in users_cursor:
-        try:
-            await bot.send_message(user["user_id"], newsletter_text)
-            count += 1
-        except Exception as e:
-            logging.warning(f"Failed to send newsletter to {user['user_id']}: {e}")
-    await message.answer(f"✅ Newsletter sent to {count} users.")
-    await state.clear()
-
 @router.message(F.reply_to_message)
 async def handle_reply(message: Message):
     if message.text and message.text.strip().startswith("/id"):
-        # Ignore /id replies here; handled by the /id command handler
         return
     if not ALLOW_ANONYMOUS_REPLY:
         return
@@ -496,7 +517,7 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
 
         sent_msg = None
         msg_detected_lang = detect_language(message.text)
-        user_lang = user.get('language', 'en') # recipient's language
+        user_lang = user.get('language', 'en')
 
         if GENERATE_IMAGE_ON_ANONYMOUS:
             image_path = generate_message_image(message.text)
@@ -535,7 +556,6 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
             await state.clear()
             return
 
-        # Store the mapping between telegram_message_id and the anonymous message
         await store_anonymous_message(
             recipient_user_id=user["user_id"],
             message_text=message.text,
@@ -557,7 +577,6 @@ async def handle_anonymous_message(message: Message, state: FSMContext):
                 "$set": {f"messages_received_daily.{today}": (user.get("messages_received_daily", {}).get(today, 0) + 1)}
             }
         )
-        # Only show translate button if language differs
         if msg_detected_lang != user_lang and msg_detected_lang != "unknown":
             try:
                 await bot.edit_message_reply_markup(
@@ -591,12 +610,11 @@ async def handle_media_not_supported(message: Message):
 async def handle_translate_callbacks(callback_query: CallbackQuery):
     data = callback_query.data.split("|")
     action = data[0]
-    telegram_msg_id = int(data[1])  # This is the Telegram msg_id you stored
+    telegram_msg_id = int(data[1])
     from_lang = data[2]
     to_lang = data[3]
     user_id = callback_query.from_user.id
 
-    # Retrieve the correct anonymous message by telegram_message_id
     msg_doc = await db.messages.find_one({
         "recipient_user_id": user_id,
         "message_type": "anonymous",
