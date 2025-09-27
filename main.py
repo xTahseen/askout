@@ -16,7 +16,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from langs import LANGS, LANG_NAMES
 
 LOG_GROUP_ID = -1002054393773
-ADMIN_IDS = [6387028671]
+ADMIN_IDS = [6816341239]
 
 from config import GENERATE_IMAGE_ON_ANONYMOUS, ALLOW_ANONYMOUS_REPLY
 from image import generate_message_image
@@ -24,7 +24,7 @@ import os
 
 from translate import google_translate, detect_language
 
-API_TOKEN = "8300519461:AAGub3h_FqGkggWkGGE95Pgh8k4u6deI_F4"
+API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
 MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "askout"
 
