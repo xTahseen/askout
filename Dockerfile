@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies + wkhtmltopdf binary (bullseye build)
+# Install dependencies needed at runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     xfonts-base \
@@ -13,16 +13,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6 \
     libx11-6 \
     xvfb && \
-    wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bullseye_amd64.deb && \
-    apt-get install -y ./wkhtmltox_0.12.6-1.bullseye_amd64.deb && \
-    rm -f wkhtmltox_0.12.6-1.bullseye_amd64.deb && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Download & install wkhtmltox generic binary
+RUN wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox-0.12.6-1-linux-generic-amd64.tar.xz && \
+    tar -xJf wkhtmltox-0.12.6-1-linux-generic-amd64.tar.xz && \
+    cp wkhtmltox/bin/wkhtmlto* /usr/local/bin/ && \
+    rm -rf wkhtmltox-0.12.6-1-linux-generic-amd64.tar.xz wkhtmltox
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy bot files
 COPY . .
 
 CMD ["python", "main.py"]
