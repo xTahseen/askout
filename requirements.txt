@@ -3,3 +3,4 @@ motor
 requests
 langdetect
 aiohttp
+imgkit
