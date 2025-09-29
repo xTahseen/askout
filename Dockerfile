@@ -1,30 +1,29 @@
 # Use an official Python image
 FROM python:3.11-slim
 
-# Set the working directory
 WORKDIR /app
 
-# Install system dependencies (wkhtmltopdf includes wkhtmltoimage)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        wkhtmltopdf \
-        xvfb \
-        libfontconfig \
-        libxrender1 \
-        libjpeg62-turbo \
-        fontconfig \
-        libfreetype6 \
-        libx11-6 && \
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    xfonts-base \
+    xfonts-75dpi \
+    libjpeg62-turbo \
+    libxrender1 \
+    libfontconfig \
+    libfreetype6 \
+    libx11-6 \
+    xvfb && \
+    wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bookworm_amd64.deb && \
+    apt-get install -y ./wkhtmltox_0.12.6-1.bookworm_amd64.deb && \
+    rm -f wkhtmltox_0.12.6-1.bookworm_amd64.deb && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your bot files into the container
+# Copy your bot files
 COPY . .
 
-# Run your bot
 CMD ["python", "main.py"]
