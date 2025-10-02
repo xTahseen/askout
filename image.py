@@ -259,7 +259,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             vertical-align: -0.15em;
         }}
     </style>
-    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
     <div class="stage" role="presentation">
