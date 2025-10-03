@@ -1,17 +1,16 @@
-# Use an official Python image
-FROM python:3.11-slim
+FROM ubuntu:22.04
 
-# Set the working directory
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip wkhtmltopdf tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy requirements if you have them
 COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy your bot files into the container
 COPY . .
 
-# Run your bot
-CMD ["python", "main.py"]
+CMD ["python3", "main.py"]
