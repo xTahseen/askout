@@ -4,6 +4,7 @@ import re
 from datetime import datetime, timezone
 import aiohttp
 import os
+from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.enums import ParseMode
@@ -41,12 +42,14 @@ from newsletter import (
     confirm_callback,
 )
 
-LOG_GROUP_ID = -1002054393773
-ADMIN_IDS = [6816341239]
+load_dotenv()
 
-API_TOKEN = "8032679205:AAHFMO9t-T7Lavbbf_noiePQoniDSHzSuVA"
-MONGODB_URL = "mongodb+srv://itxcriminal:qureshihashmI1@cluster0.jyqy9.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "askout"
+API_TOKEN = os.getenv("API_TOKEN")
+MONGODB_URL = os.getenv("MONGODB_URL")
+DB_NAME = os.getenv("DB_NAME")
+
+LOG_GROUP_ID = int(os.getenv("LOG_GROUP_ID"))
+ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split(",")))
 
 logging.basicConfig(level=logging.INFO)
 
