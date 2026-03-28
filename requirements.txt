@@ -4,3 +4,4 @@ requests
 langdetect
 aiohttp
 imgkit
+python-dotenv
